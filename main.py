@@ -1,3 +1,4 @@
+import pandas as pd
 import cohere
 import google.generativeai as palm
 import openai
@@ -72,34 +73,97 @@ def get_openai_response(query):
     return response.choices[0].message.content
 
 
-def get_model_responses(query):
-    cohere_response = get_cohere_response(query)
-    openai_response = get_openai_response(query)
-    palm_response = get_palm_response(query)
+# st.header("Compare AI Tools")
+# st.divider()
+# query = st.text_area(label="Query")
+# button_clicked = st.button("Submit")
+# st.divider()
+# if button_clicked:
+#     with st.spinner("Waiting for responses..."):
+#         model_responses = get_model_responses(query)
 
-    model_responses = {
-        "cohere": cohere_response,
-        "openai": openai_response,
-        "palm": palm_response,
-    }
+#     st.subheader("Cohere Response")
+#     cohere_response = st.text(body=model_responses["cohere"])
 
-    return model_responses
+#     st.subheader("OpenAI Response")
+#     cohere_response = st.text(body=model_responses["openai"])
 
+#     st.subheader("PALM Response")
+#     cohere_response = st.text(body=model_responses["palm"])
+
+
+def get_model_responses(query, error_number, model_name):
+    print(f"Processing error {error_number} with {model_name}...")
+
+    if model_name == "cohere":
+        cohere_response = get_cohere_response(query)
+        print("Cohere finished responding")
+        return cohere_response
+
+    elif model_name == "openai":
+        openai_response = get_openai_response(query)
+        print("OpenAI finished responding")
+        return openai_response
+
+    elif model_name == "palm":
+        palm_response = get_palm_response(query)
+        print("PALM finished responding")
+        return palm_response
+
+    else:
+        print(f"Invalid model name: {model_name}")
+        return None
+
+
+def process_code_snippets(file_path):
+    # Read the CSV file
+    snippets_df = pd.read_csv(file_path)
+
+    # Initialize a list to store the results
+    results = []
+
+    # Iterate over each row in the DataFrame
+    for index, row in snippets_df.iterrows():
+        error_number = row["number"]
+        code_snippet = row["code"]
+        query = f"What's the error here?\n\n{code_snippet}"
+
+        # Get the model responses for each code snippet
+        cohere_response = get_model_responses(query, error_number, "cohere")
+        openai_response = get_model_responses(query, error_number, "openai")
+        palm_response = get_model_responses(query, error_number, "palm")
+
+        # Add the original snippet information with the new responses
+        result = {
+            "number": error_number,
+            "title": row["title"],
+            "code": row["code"],
+            "explanation": row["explanation"],
+            "cohere_response": cohere_response,
+            "openai_response": openai_response,
+            "palm_response": palm_response,
+        }
+        results.append(result)
+
+    # Convert the results list to a DataFrame
+    results_df = pd.DataFrame(results)
+
+    # Write the DataFrame to a new CSV file
+    results_df.to_csv("results.csv", index=False)
+    print("Results saved to 'results.csv'.")
+
+
+# Update the Streamlit UI to handle file uploads
 
 st.header("Compare AI Tools")
 st.divider()
-query = st.text_input(label="Query")
+uploaded_file = st.file_uploader("Upload CSV file with code snippets", type="csv")
 button_clicked = st.button("Submit")
 st.divider()
-if button_clicked:
-    with st.spinner("Waiting for responses..."):
-        model_responses = get_model_responses(query)
 
-    st.subheader("Cohere Response")
-    cohere_response = st.text(body=model_responses["cohere"])
+if button_clicked and uploaded_file:
+    with st.spinner("Processing..."):
+        # Process the uploaded CSV file
+        process_code_snippets(uploaded_file)
 
-    st.subheader("OpenAI Response")
-    cohere_response = st.text(body=model_responses["openai"])
-
-    st.subheader("PALM Response")
-    cohere_response = st.text(body=model_responses["palm"])
+    st.success("Processing complete! Check 'results.csv' for the model responses.")
