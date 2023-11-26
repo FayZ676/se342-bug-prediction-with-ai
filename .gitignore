@@ -1,3 +1,4 @@
 .env
 __pycache__
 flagged
+.DS_Store
